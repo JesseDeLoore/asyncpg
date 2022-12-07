@@ -54,23 +54,22 @@ class PostgresMessageMeta(type):
         if _is_asyncpg_class(cls):
             mod = sys.modules[cls.__module__]
             if hasattr(mod, name):
-                raise RuntimeError('exception class redefinition: {}'.format(
-                    name))
+                raise RuntimeError(f'exception class redefinition: {name}')
 
         code = dct.get('sqlstate')
         if code is not None:
             existing = mcls._message_map.get(code)
             if existing is not None:
-                raise TypeError('{} has duplicate SQLSTATE code, which is'
-                                'already defined by {}'.format(
-                                    name, existing.__name__))
+                raise TypeError(
+                    f'{name} has duplicate SQLSTATE code, which isalready defined by {existing.__name__}'
+                )
             mcls._message_map[code] = cls
 
         return cls
 
     @classmethod
-    def get_message_class_for_sqlstate(mcls, code):
-        return mcls._message_map.get(code, UnknownPostgresError)
+    def get_message_class_for_sqlstate(cls, code):
+        return cls._message_map.get(code, UnknownPostgresError)
 
 
 class PostgresMessage(metaclass=PostgresMessageMeta):
@@ -88,8 +87,7 @@ class PostgresMessage(metaclass=PostgresMessageMeta):
 
         field_map = type(cls)._field_map
         for k, v in fields.items():
-            field = field_map.get(k)
-            if field:
+            if field := field_map.get(k):
                 dct[field] = v
 
         return dct
@@ -101,35 +99,21 @@ class PostgresMessage(metaclass=PostgresMessageMeta):
         exccls = cls._get_error_class(fields)
         message = dct.get('message', '')
 
-        # PostgreSQL will raise an exception when it detects
-        # that the result type of the query has changed from
-        # when the statement was prepared.
-        #
-        # The original error is somewhat cryptic and unspecific,
-        # so we raise a custom subclass that is easier to handle
-        # and identify.
-        #
-        # Note that we specifically do not rely on the error
-        # message, as it is localizable.
-        is_icse = (
-            exccls.__name__ == 'FeatureNotSupportedError' and
-            _is_asyncpg_class(exccls) and
-            dct.get('server_source_function') == 'RevalidateCachedQuery'
-        )
-
-        if is_icse:
+        if is_icse := (
+            exccls.__name__ == 'FeatureNotSupportedError'
+            and _is_asyncpg_class(exccls)
+            and dct.get('server_source_function') == 'RevalidateCachedQuery'
+        ):
             exceptions = sys.modules[exccls.__module__]
             exccls = exceptions.InvalidCachedStatementError
             message = ('cached statement plan is invalid due to a database '
                        'schema or configuration change')
 
-        is_prepared_stmt_error = (
-            exccls.__name__ in ('DuplicatePreparedStatementError',
-                                'InvalidSQLStatementNameError') and
-            _is_asyncpg_class(exccls)
-        )
-
-        if is_prepared_stmt_error:
+        if is_prepared_stmt_error := (
+            exccls.__name__
+            in ('DuplicatePreparedStatementError', 'InvalidSQLStatementNameError')
+            and _is_asyncpg_class(exccls)
+        ):
             hint = dct.get('hint', '')
             hint += textwrap.dedent("""\
 
@@ -166,9 +150,9 @@ class PostgresError(PostgresMessage, Exception):
     def __str__(self):
         msg = self.args[0]
         if self.detail:
-            msg += '\nDETAIL:  {}'.format(self.detail)
+            msg += f'\nDETAIL:  {self.detail}'
         if self.hint:
-            msg += '\nHINT:  {}'.format(self.hint)
+            msg += f'\nHINT:  {self.hint}'
 
         return msg
 
@@ -196,9 +180,9 @@ class InterfaceMessage:
     def __str__(self):
         msg = self.args[0]
         if self.detail:
-            msg += '\nDETAIL:  {}'.format(self.detail)
+            msg += f'\nDETAIL:  {self.detail}'
         if self.hint:
-            msg += '\nHINT:  {}'.format(self.hint)
+            msg += f'\nHINT:  {self.hint}'
 
         return msg
 
@@ -258,11 +242,10 @@ class PostgresLogMessage(PostgresMessage):
     """A base class for non-error server messages."""
 
     def __str__(self):
-        return '{}: {}'.format(type(self).__name__, self.message)
+        return f'{type(self).__name__}: {self.message}'
 
     def __setattr__(self, name, val):
-        raise TypeError('instances of {} are immutable'.format(
-            type(self).__name__))
+        raise TypeError(f'instances of {type(self).__name__} are immutable')
 
     @classmethod
     def new(cls, fields, query=None):

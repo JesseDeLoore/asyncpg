@@ -158,18 +158,26 @@ class TestAuthentication(tb.ConnectedTestCase):
             if _system != 'Windows':
                 self.cluster.add_hba_entry(
                     type='local',
-                    database='postgres', user='{}_user'.format(username),
-                    auth_method=method)
+                    database='postgres',
+                    user=f'{username}_user',
+                    auth_method=method,
+                )
 
             self.cluster.add_hba_entry(
-                type='host', address=ipaddress.ip_network('127.0.0.0/24'),
-                database='postgres', user='{}_user'.format(username),
-                auth_method=method)
+                type='host',
+                address=ipaddress.ip_network('127.0.0.0/24'),
+                database='postgres',
+                user=f'{username}_user',
+                auth_method=method,
+            )
 
             self.cluster.add_hba_entry(
-                type='host', address=ipaddress.ip_network('::1/128'),
-                database='postgres', user='{}_user'.format(username),
-                auth_method=method)
+                type='host',
+                address=ipaddress.ip_network('::1/128'),
+                database='postgres',
+                user=f'{username}_user',
+                auth_method=method,
+            )
 
         # Put hba changes into effect
         self.cluster.reload()
@@ -196,7 +204,7 @@ class TestAuthentication(tb.ConnectedTestCase):
 
             username = method.replace('-', '_')
 
-            drop_script.append('DROP ROLE {}_user;'.format(username))
+            drop_script.append(f'DROP ROLE {username}_user;')
 
         drop_script = '\n'.join(drop_script)
         self.loop.run_until_complete(self.con.execute(drop_script))
@@ -208,12 +216,9 @@ class TestAuthentication(tb.ConnectedTestCase):
         # the connection sooner than we receive the
         # actual error.
         if _system == 'Windows':
-            for tried in range(3):
-                try:
+            for _ in range(3):
+                with contextlib.suppress(asyncpg.ConnectionDoesNotExistError):
                     return await self.connect(**kwargs)
-                except asyncpg.ConnectionDoesNotExistError:
-                    pass
-
         return await self.connect(**kwargs)
 
     async def test_auth_bad_user(self):
@@ -752,11 +757,7 @@ class TestConnectParams(tb.TestCase):
 
     @contextlib.contextmanager
     def environ(self, **kwargs):
-        old_vals = {}
-        for key in kwargs:
-            if key in os.environ:
-                old_vals[key] = os.environ[key]
-
+        old_vals = {key: os.environ[key] for key in kwargs if key in os.environ}
         for key, val in kwargs.items():
             if val is None:
                 if key in os.environ:
@@ -778,7 +779,7 @@ class TestConnectParams(tb.TestCase):
         test_env = {'PGHOST': None, 'PGPORT': None,
                     'PGUSER': None, 'PGPASSWORD': None,
                     'PGDATABASE': None, 'PGSSLMODE': None}
-        test_env.update(env)
+        test_env |= env
 
         dsn = testcase.get('dsn')
         user = testcase.get('user')
@@ -835,7 +836,7 @@ class TestConnectParams(tb.TestCase):
                 # unless explicitly tested for
                 params.pop('direct_tls', False)
 
-            self.assertEqual(expected, result, 'Testcase: {}'.format(testcase))
+            self.assertEqual(expected, result, f'Testcase: {testcase}')
 
     def test_test_connect_params_environ(self):
         self.assertNotIn('AAAAAAAAAA123', os.environ)
@@ -932,18 +933,19 @@ class TestConnectParams(tb.TestCase):
             })
 
             # passfile path in dsn
-            self.run_testcase({
-                'dsn': 'postgres://user@abc/db?passfile={}'.format(
-                    passfile.name),
-                'result': (
-                    [('abc', 5432)],
-                    {
-                        'password': 'password from pgpass for user@abc',
-                        'user': 'user',
-                        'database': 'db',
-                    }
-                )
-            })
+            self.run_testcase(
+                {
+                    'dsn': f'postgres://user@abc/db?passfile={passfile.name}',
+                    'result': (
+                        [('abc', 5432)],
+                        {
+                            'password': 'password from pgpass for user@abc',
+                            'user': 'user',
+                            'database': 'db',
+                        },
+                    ),
+                }
+            )
 
             self.run_testcase({
                 'host': 'localhost',
@@ -1217,10 +1219,11 @@ class TestConnection(tb.ConnectedTestCase):
             con = None
             try:
                 con = await self.connect(
-                    dsn='postgresql://foo/?sslmode=' + sslmode,
+                    dsn=f'postgresql://foo/?sslmode={sslmode}',
                     user='postgres',
                     database='postgres',
-                    host='localhost')
+                    host='localhost',
+                )
                 self.assertEqual(await con.fetchval('SELECT 42'), 42)
                 self.assertFalse(con._protocol.is_ssl)
             finally:
@@ -1232,10 +1235,11 @@ class TestConnection(tb.ConnectedTestCase):
             try:
                 with self.assertRaises(ConnectionError):
                     con = await self.connect(
-                        dsn='postgresql://foo/?sslmode=' + sslmode,
+                        dsn=f'postgresql://foo/?sslmode={sslmode}',
                         user='postgres',
                         database='postgres',
-                        host='localhost')
+                        host='localhost',
+                    )
                     await con.fetchval('SELECT 42')
             finally:
                 if con:
@@ -1286,9 +1290,7 @@ class BaseTestSSLConnection(tb.ConnectedTestCase):
 
         self.cluster.reset_hba()
 
-        create_script = []
-        create_script.append('CREATE ROLE ssl_user WITH LOGIN;')
-
+        create_script = ['CREATE ROLE ssl_user WITH LOGIN;']
         self._add_hba_entry()
 
         # Put hba changes into effect
@@ -1301,8 +1303,7 @@ class BaseTestSSLConnection(tb.ConnectedTestCase):
         # Reset cluster's pg_hba.conf since we've meddled with it
         self.cluster.trust_local_connections()
 
-        drop_script = []
-        drop_script.append('DROP ROLE ssl_user;')
+        drop_script = ['DROP ROLE ssl_user;']
         drop_script = '\n'.join(drop_script)
         self.loop.run_until_complete(self.con.execute(drop_script))
 
@@ -1349,9 +1350,10 @@ class TestSSLConnection(BaseTestSSLConnection):
             con = None
             try:
                 con = await self.connect(
-                    dsn='postgresql://foo/postgres?sslmode=' + sslmode,
+                    dsn=f'postgresql://foo/postgres?sslmode={sslmode}',
                     host=host,
-                    user='ssl_user')
+                    user='ssl_user',
+                )
                 self.assertEqual(await con.fetchval('SELECT 42'), 42)
                 self.assertTrue(con._protocol.is_ssl)
             finally:
@@ -1366,9 +1368,10 @@ class TestSSLConnection(BaseTestSSLConnection):
                 self.loop.set_exception_handler(lambda *args: None)
                 with self.assertRaises(exn_type):
                     con = await self.connect(
-                        dsn='postgresql://foo/?sslmode=' + sslmode,
+                        dsn=f'postgresql://foo/?sslmode={sslmode}',
                         host=host,
-                        user='ssl_user')
+                        user='ssl_user',
+                    )
                     await con.fetchval('SELECT 42')
             finally:
                 if con:
@@ -1583,13 +1586,13 @@ class TestClientSSLConnection(BaseTestSSLConnection):
             'sslmode': 'verify-full',
         }
         params_str = urllib.parse.urlencode(params)
-        dsn = 'postgres://ssl_user@localhost/postgres?' + params_str
+        dsn = f'postgres://ssl_user@localhost/postgres?{params_str}'
         await self._test_works(dsn=dsn)
 
         params['sslkey'] = CLIENT_SSL_PROTECTED_KEY_FILE
         params['sslpassword'] = 'secRet'
         params_str = urllib.parse.urlencode(params)
-        dsn = 'postgres://ssl_user@localhost/postgres?' + params_str
+        dsn = f'postgres://ssl_user@localhost/postgres?{params_str}'
         await self._test_works(dsn=dsn)
 
     async def test_ssl_connection_client_auth_env(self):
@@ -1604,14 +1607,14 @@ class TestClientSSLConnection(BaseTestSSLConnection):
 
         env['PGSSLKEY'] = CLIENT_SSL_PROTECTED_KEY_FILE
         with unittest.mock.patch.dict('os.environ', env):
-            await self._test_works(dsn=dsn + '&sslpassword=secRet')
+            await self._test_works(dsn=f'{dsn}&sslpassword=secRet')
 
     async def test_ssl_connection_client_auth_dot_postgresql(self):
         dsn = 'postgres://ssl_user@localhost/postgres?sslmode=verify-full'
         with mock_dot_postgresql(client=True):
             await self._test_works(dsn=dsn)
         with mock_dot_postgresql(client=True, protected=True):
-            await self._test_works(dsn=dsn + '&sslpassword=secRet')
+            await self._test_works(dsn=f'{dsn}&sslpassword=secRet')
 
 
 @unittest.skipIf(os.environ.get('PGHOST'), 'unmanaged cluster')
@@ -1632,9 +1635,10 @@ class TestNoSSLConnection(BaseTestSSLConnection):
             con = None
             try:
                 con = await self.connect(
-                    dsn='postgresql://foo/postgres?sslmode=' + sslmode,
+                    dsn=f'postgresql://foo/postgres?sslmode={sslmode}',
                     host=host,
-                    user='ssl_user')
+                    user='ssl_user',
+                )
                 self.assertEqual(await con.fetchval('SELECT 42'), 42)
                 self.assertFalse(con._protocol.is_ssl)
             finally:
@@ -1648,12 +1652,13 @@ class TestNoSSLConnection(BaseTestSSLConnection):
             try:
                 self.loop.set_exception_handler(lambda *args: None)
                 with self.assertRaises(
-                        asyncpg.InvalidAuthorizationSpecificationError
-                ):
+                                    asyncpg.InvalidAuthorizationSpecificationError
+                            ):
                     con = await self.connect(
-                        dsn='postgresql://foo/?sslmode=' + sslmode,
+                        dsn=f'postgresql://foo/?sslmode={sslmode}',
                         host=host,
-                        user='ssl_user')
+                        user='ssl_user',
+                    )
                     await con.fetchval('SELECT 42')
             finally:
                 if con:

@@ -133,11 +133,7 @@ class PreparedStatement(connresource.ConnectionResource):
                  is actually a deserialized JSON output of the SQL
                  ``EXPLAIN`` command.
         """
-        query = 'EXPLAIN (FORMAT JSON, VERBOSE'
-        if analyze:
-            query += ', ANALYZE) '
-        else:
-            query += ') '
+        query = 'EXPLAIN (FORMAT JSON, VERBOSE' + (', ANALYZE) ' if analyze else ') ')
         query += self._state.query
 
         if analyze:
@@ -173,8 +169,7 @@ class PreparedStatement(connresource.ConnectionResource):
 
         :return: A list of :class:`Record` instances.
         """
-        data = await self.__bind_execute(args, 0, timeout)
-        return data
+        return await self.__bind_execute(args, 0, timeout)
 
     @connresource.guarded
     async def fetchval(self, *args, column=0, timeout=None):
@@ -191,9 +186,7 @@ class PreparedStatement(connresource.ConnectionResource):
         :return: The value of the specified column of the first record.
         """
         data = await self.__bind_execute(args, 1, timeout)
-        if not data:
-            return None
-        return data[0][column]
+        return data[0][column] if data else None
 
     @connresource.guarded
     async def fetchrow(self, *args, timeout=None):
@@ -206,9 +199,7 @@ class PreparedStatement(connresource.ConnectionResource):
         :return: The first row as a :class:`Record` instance.
         """
         data = await self.__bind_execute(args, 1, timeout)
-        if not data:
-            return None
-        return data[0]
+        return data[0] if data else None
 
     @connresource.guarded
     async def executemany(self, args, *, timeout: float=None):
@@ -247,8 +238,8 @@ class PreparedStatement(connresource.ConnectionResource):
     def _check_open(self, meth_name):
         if self._state.closed:
             raise exceptions.InterfaceError(
-                'cannot call PreparedStmt.{}(): '
-                'the prepared statement is closed'.format(meth_name))
+                f'cannot call PreparedStmt.{meth_name}(): the prepared statement is closed'
+            )
 
     def _check_conn_validity(self, meth_name):
         self._check_open(meth_name)

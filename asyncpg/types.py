@@ -122,21 +122,23 @@ class Range:
         return not self._empty
 
     def __eq__(self, other):
-        if not isinstance(other, Range):
-            return NotImplemented
-
         return (
-            self._lower,
-            self._upper,
-            self._lower_inc,
-            self._upper_inc,
-            self._empty
-        ) == (
-            other._lower,
-            other._upper,
-            other._lower_inc,
-            other._upper_inc,
-            other._empty
+            (
+                self._lower,
+                self._upper,
+                self._lower_inc,
+                self._upper_inc,
+                self._empty,
+            )
+            == (
+                other._lower,
+                other._upper,
+                other._lower_inc,
+                other._upper_inc,
+                other._empty,
+            )
+            if isinstance(other, Range)
+            else NotImplemented
         )
 
     def __hash__(self):
@@ -152,26 +154,15 @@ class Range:
         if self._empty:
             desc = 'empty'
         else:
-            if self._lower is None or not self._lower_inc:
-                lb = '('
-            else:
-                lb = '['
-
+            lb = '(' if self._lower is None or not self._lower_inc else '['
             if self._lower is not None:
                 lb += repr(self._lower)
 
-            if self._upper is not None:
-                ub = repr(self._upper)
-            else:
-                ub = ''
+            ub = (repr(self._upper) if self._upper is not None else '') + (
+                ')' if self._upper is None or not self._upper_inc else ']'
+            )
+            desc = f'{lb}, {ub}'
 
-            if self._upper is None or not self._upper_inc:
-                ub += ')'
-            else:
-                ub += ']'
-
-            desc = '{}, {}'.format(lb, ub)
-
-        return '<Range {}>'.format(desc)
+        return f'<Range {desc}>'
 
     __str__ = __repr__

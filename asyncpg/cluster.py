@@ -26,9 +26,7 @@ _system = platform.uname().system
 
 if _system == 'Windows':
     def platform_exe(name):
-        if name.endswith('.exe'):
-            return name
-        return name + '.exe'
+        return name if name.endswith('.exe') else f'{name}.exe'
 else:
     def platform_exe(name):
         return name
@@ -89,10 +87,8 @@ class Cluster:
         elif process.returncode == 0:
             r = re.match(r'.*PID\s?:\s+(\d+).*', stdout.decode())
             if not r:
-                raise ClusterError(
-                    'could not parse pg_ctl status output: {}'.format(
-                        stdout.decode()))
-            self._daemon_pid = int(r.group(1))
+                raise ClusterError(f'could not parse pg_ctl status output: {stdout.decode()}')
+            self._daemon_pid = int(r[1])
             return self._test_connection(timeout=0)
         else:
             raise ClusterError(
@@ -116,8 +112,7 @@ class Cluster:
             settings['encoding'] = 'UTF-8'
 
         if settings:
-            settings_args = ['--{}={}'.format(k, v)
-                             for k, v in settings.items()]
+            settings_args = [f'--{k}={v}' for k, v in settings.items()]
             extra_args = ['-o'] + [' '.join(settings_args)]
         else:
             extra_args = []
@@ -149,8 +144,8 @@ class Cluster:
         if port == 'dynamic':
             port = find_available_port()
 
-        extra_args = ['--{}={}'.format(k, v) for k, v in opts.items()]
-        extra_args.append('--port={}'.format(port))
+        extra_args = [f'--{k}={v}' for k, v in opts.items()]
+        extra_args.append(f'--port={port}')
 
         sockdir = server_settings.get('unix_socket_directories')
         if sockdir is None:
@@ -158,8 +153,7 @@ class Cluster:
         if sockdir is None and _system != 'Windows':
             sockdir = tempfile.gettempdir()
 
-        ssl_key = server_settings.get('ssl_key_file')
-        if ssl_key:
+        if ssl_key := server_settings.get('ssl_key_file'):
             # Make sure server certificate key file has correct permissions.
             keyfile = os.path.join(self._data_dir, 'srvkey.pem')
             shutil.copy(ssl_key, keyfile)
@@ -176,7 +170,7 @@ class Cluster:
             server_settings[sockdir_opt] = sockdir
 
         for k, v in server_settings.items():
-            extra_args.extend(['-c', '{}={}'.format(k, v)])
+            extra_args.extend(['-c', f'{k}={v}'])
 
         if _system == 'Windows':
             # On Windows we have to use pg_ctl as direct execution
@@ -202,10 +196,7 @@ class Cluster:
                 stdout=stdout, stderr=subprocess.STDOUT)
 
             if process.returncode != 0:
-                if process.stderr:
-                    stderr = ':\n{}'.format(process.stderr.decode())
-                else:
-                    stderr = ''
+                stderr = f':\n{process.stderr.decode()}' if process.stderr else ''
                 raise ClusterError(
                     'pg_ctl start exited with status {:d}{}'.format(
                         process.returncode, stderr))
@@ -216,7 +207,7 @@ class Cluster:
                 stdout = subprocess.DEVNULL
 
             self._daemon_process = \
-                subprocess.Popen(
+                    subprocess.Popen(
                     [self._postgres, '-D', self._data_dir, *extra_args],
                     stdout=stdout, stderr=subprocess.STDOUT)
 
@@ -234,9 +225,9 @@ class Cluster:
             [self._pg_ctl, 'reload', '-D', self._data_dir],
             stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
-        stderr = process.stderr
-
         if process.returncode != 0:
+            stderr = process.stderr
+
             raise ClusterError(
                 'pg_ctl stop exited with status {:d}: {}'.format(
                     process.returncode, stderr.decode()))
@@ -260,22 +251,21 @@ class Cluster:
 
     def destroy(self):
         status = self.get_status()
-        if status == 'stopped' or status == 'not-initialized':
+        if status in ['stopped', 'not-initialized']:
             shutil.rmtree(self._data_dir)
         else:
-            raise ClusterError('cannot destroy {} cluster'.format(status))
+            raise ClusterError(f'cannot destroy {status} cluster')
 
     def _get_connection_spec(self):
         if self._connection_addr is None:
             self._connection_addr = self._connection_addr_from_pidfile()
 
         if self._connection_addr is not None:
-            if self._connection_spec_override:
-                args = self._connection_addr.copy()
-                args.update(self._connection_spec_override)
-                return args
-            else:
+            if not self._connection_spec_override:
                 return self._connection_addr
+            args = self._connection_addr.copy()
+            args.update(self._connection_spec_override)
+            return args
 
     def get_connection_spec(self):
         status = self.get_status()
@@ -316,9 +306,9 @@ class Cluster:
             [reset_wal] + opts,
             stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
-        stderr = process.stderr
-
         if process.returncode != 0:
+            stderr = process.stderr
+
             raise ClusterError(
                 'pg_resetwal exited with status {:d}: {}'.format(
                     process.returncode, stderr.decode()))
@@ -336,8 +326,7 @@ class Cluster:
             with open(pg_hba, 'w'):
                 pass
         except IOError as e:
-            raise ClusterError(
-                'cannot modify HBA records: {}'.format(e)) from e
+            raise ClusterError(f'cannot modify HBA records: {e}') from e
 
     def add_hba_entry(self, *, type='host', database, user, address=None,
                       auth_method, auth_options=None):
@@ -352,27 +341,25 @@ class Cluster:
 
         pg_hba = os.path.join(self._data_dir, 'pg_hba.conf')
 
-        record = '{} {} {}'.format(type, database, user)
+        record = f'{type} {database} {user}'
 
         if type != 'local':
             if address is None:
                 raise ValueError(
                     '{!r} entry requires a valid address'.format(type))
             else:
-                record += ' {}'.format(address)
+                record += f' {address}'
 
-        record += ' {}'.format(auth_method)
+        record += f' {auth_method}'
 
         if auth_options is not None:
-            record += ' ' + ' '.join(
-                '{}={}'.format(k, v) for k, v in auth_options)
+            record += (' ' + ' '.join(f'{k}={v}' for k, v in auth_options))
 
         try:
             with open(pg_hba, 'a') as f:
                 print(record, file=f)
         except IOError as e:
-            raise ClusterError(
-                'cannot modify HBA records: {}'.format(e)) from e
+            raise ClusterError(f'cannot modify HBA records: {e}') from e
 
     def trust_local_connections(self):
         self.reset_hba()
@@ -410,9 +397,9 @@ class Cluster:
             pg_config_data = self._run_pg_config(pg_config)
 
             self._pg_bin_dir = pg_config_data.get('bindir')
-            if not self._pg_bin_dir:
-                raise ClusterError(
-                    'pg_config output did not provide the BINDIR value')
+        if not self._pg_bin_dir:
+            raise ClusterError(
+                'pg_config output did not provide the BINDIR value')
 
         self._pg_ctl = self._find_pg_binary('pg_ctl')
         self._postgres = self._find_pg_binary('postgres')
@@ -440,10 +427,9 @@ class Cluster:
             return None
 
         portnum = lines[3]
-        sockdir = lines[4]
         hostaddr = lines[5]
 
-        if sockdir:
+        if sockdir := lines[4]:
             if sockdir[0] != '/':
                 # Relative sockdir
                 sockdir = os.path.normpath(
@@ -470,7 +456,7 @@ class Cluster:
         loop = asyncio.new_event_loop()
 
         try:
-            for i in range(timeout):
+            for _ in range(timeout):
                 if self._connection_addr is None:
                     conn_spec = self._get_connection_spec()
                     if conn_spec is None:
@@ -509,23 +495,20 @@ class Cluster:
         if process.returncode != 0:
             raise ClusterError('pg_config exited with status {:d}: {}'.format(
                 process.returncode, stderr))
-        else:
-            config = {}
+        config = {}
 
-            for line in stdout.splitlines():
-                k, eq, v = line.decode('utf-8').partition('=')
-                if eq:
-                    config[k.strip().lower()] = v.strip()
+        for line in stdout.splitlines():
+            k, eq, v = line.decode('utf-8').partition('=')
+            if eq:
+                config[k.strip().lower()] = v.strip()
 
-            return config
+        return config
 
     def _find_pg_config(self, pg_config_path):
         if pg_config_path is None:
-            pg_install = (
-                os.environ.get('PGINSTALLATION')
-                or os.environ.get('PGBIN')
-            )
-            if pg_install:
+            if pg_install := (
+                os.environ.get('PGINSTALLATION') or os.environ.get('PGBIN')
+            ):
                 pg_config_path = platform_exe(
                     os.path.join(pg_install, 'pg_config'))
             else:
@@ -552,8 +535,11 @@ class Cluster:
 
         if not os.path.isfile(bpath):
             raise ClusterError(
-                'could not find {} executable: '.format(binary) +
-                '{!r} does not exist or is not a file'.format(bpath))
+                (
+                    f'could not find {binary} executable: '
+                    + '{!r} does not exist or is not a file'.format(bpath)
+                )
+            )
 
         return bpath
 

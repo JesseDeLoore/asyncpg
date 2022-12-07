@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 
 class PoolConnectionProxyMeta(type):
 
-    def __new__(mcls, name, bases, dct, *, wrap=False):
+    def __new__(cls, name, bases, dct, *, wrap=False):
         if wrap:
             for attrname in dir(connection.Connection):
                 if attrname.startswith('_') or attrname in dct:
@@ -34,14 +34,14 @@ class PoolConnectionProxyMeta(type):
                 if not inspect.isfunction(meth):
                     continue
 
-                wrapper = mcls._wrap_connection_method(attrname)
+                wrapper = cls._wrap_connection_method(attrname)
                 wrapper = functools.update_wrapper(wrapper, meth)
                 dct[attrname] = wrapper
 
             if '__doc__' not in dct:
                 dct['__doc__'] = connection.Connection.__doc__
 
-        return super().__new__(mcls, name, bases, dct)
+        return super().__new__(cls, name, bases, dct)
 
     def __init__(cls, name, bases, dct, *, wrap=False):
         # Needed for Python 3.5 to handle `wrap` class keyword argument.

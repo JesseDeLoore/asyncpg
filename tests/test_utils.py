@@ -25,8 +25,7 @@ class TestUtils(tb.ConnectedTestCase):
 
         for typename, data, expected in cases:
             with self.subTest(value=data, type=typename):
-                mogrified = await utils._mogrify(
-                    self.con, 'SELECT $1::{}'.format(typename), [data])
+                mogrified = await utils._mogrify(self.con, f'SELECT $1::{typename}', [data])
                 self.assertEqual(mogrified, expected)
 
     async def test_mogrify_multiple(self):

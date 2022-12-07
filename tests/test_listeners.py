@@ -254,12 +254,8 @@ class TestLogListeners(tb.ConnectedTestCase):
                 await con.execute("SELECT _test($1)", cur_id)
 
             for cur_id in range(10):
-                self.assertEqual(
-                    q1.get_nowait(),
-                    (con, cur_id, '1_%s' % cur_id))
-                self.assertEqual(
-                    q1.get_nowait(),
-                    (con, cur_id, '2_%s' % cur_id))
+                self.assertEqual(q1.get_nowait(), (con, cur_id, f'1_{cur_id}'))
+                self.assertEqual(q1.get_nowait(), (con, cur_id, f'2_{cur_id}'))
 
             con.remove_log_listener(notice_callb)
             self.assertTrue(q1.empty())

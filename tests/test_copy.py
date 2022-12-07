@@ -462,6 +462,9 @@ class TestCopyTo(tb.ConnectedTestCase):
         ''')
 
         try:
+
+
+
             class _Source:
                 def __init__(self):
                     self.rowcount = 0
@@ -472,9 +475,9 @@ class TestCopyTo(tb.ConnectedTestCase):
                 async def __anext__(self):
                     if self.rowcount >= 100:
                         raise StopAsyncIteration
-                    else:
-                        self.rowcount += 1
-                        return b'a1' * 500000 + b'\t' + b'b1' * 500000 + b'\n'
+                    self.rowcount += 1
+                    return b'a1' * 500000 + b'\t' + b'b1' * 500000 + b'\n'
+
 
             res = await self.con.copy_to_table('copytab', source=_Source())
 
@@ -526,6 +529,9 @@ class TestCopyTo(tb.ConnectedTestCase):
         ''')
 
         try:
+
+
+
             class _Source:
                 def __init__(self):
                     self.rowcount = 0
@@ -534,11 +540,12 @@ class TestCopyTo(tb.ConnectedTestCase):
                     return self
 
                 async def __anext__(self):
-                    if self.rowcount == 0:
-                        self.rowcount += 1
-                        return b'a\tb\n'
-                    else:
+                    if self.rowcount != 0:
                         raise RuntimeError('failure in source')
+
+                    self.rowcount += 1
+                    return b'a\tb\n'
+
 
             with self.assertRaisesRegex(RuntimeError, 'failure in source'):
                 await self.con.copy_to_table('copytab', source=_Source())
@@ -629,10 +636,7 @@ class TestCopyTo(tb.ConnectedTestCase):
             date = datetime.datetime.now(tz=datetime.timezone.utc)
             delta = datetime.timedelta(days=1)
 
-            records = [
-                ('a-{}'.format(i), i, date + delta)
-                for i in range(100)
-            ]
+            records = [(f'a-{i}', i, date + delta) for i in range(100)]
 
             records.append(('a-100', None, None))
 

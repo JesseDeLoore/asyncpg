@@ -9,11 +9,11 @@ import re
 
 
 def _quote_ident(ident):
-    return '"{}"'.format(ident.replace('"', '""'))
+    return f""""{ident.replace('"', '""')}\""""
 
 
 def _quote_literal(string):
-    return "'{}'".format(string.replace("'", "''"))
+    return f"""'{string.replace("'", "''")}'"""
 
 
 async def _mogrify(conn, query, args):
@@ -23,19 +23,16 @@ async def _mogrify(conn, query, args):
     ps = await conn.prepare(query)
     paramtypes = []
     for t in ps.get_parameters():
-        if t.name.endswith('[]'):
-            pname = '_' + t.name[:-2]
-        else:
-            pname = t.name
-
-        paramtypes.append('{}.{}'.format(
-            _quote_ident(t.schema), _quote_ident(pname)))
+        pname = f'_{t.name[:-2]}' if t.name.endswith('[]') else t.name
+        paramtypes.append(f'{_quote_ident(t.schema)}.{_quote_ident(pname)}')
     del ps
 
     # Use Postgres to convert arguments to text representation
     # by casting each value to text.
-    cols = ['quote_literal(${}::{}::text)'.format(i, t)
-            for i, t in enumerate(paramtypes, start=1)]
+    cols = [
+        f'quote_literal(${i}::{t}::text)'
+        for i, t in enumerate(paramtypes, start=1)
+    ]
 
     textified = await conn.fetchrow(
         'SELECT {cols}'.format(cols=', '.join(cols)), *args)

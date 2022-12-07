@@ -35,7 +35,7 @@ class TestEnvironment(tb.ConnectedTestCase):
     async def test_environment_asyncpg_version(self):
         apgver = os.environ.get('ASYNCPG_VERSION')
         self.assertEqual(
-            asyncpg.__version__, apgver,
-            'Expecting asyncpg version {}, got {}.'.format(
-                apgver, asyncpg.__version__)
+            asyncpg.__version__,
+            apgver,
+            f'Expecting asyncpg version {apgver}, got {asyncpg.__version__}.',
         )

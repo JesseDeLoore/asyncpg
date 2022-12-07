@@ -473,17 +473,11 @@ class TestCodecs(tb.ConnectedTestCase):
             if metadata and self.server_version < metadata[0]:
                 continue
 
-            st = await self.con.prepare(
-                "SELECT $1::" + typname
-            )
+            st = await self.con.prepare(f"SELECT $1::{typname}")
 
-            text_in = await self.con.prepare(
-                "SELECT $1::text::" + typname
-            )
+            text_in = await self.con.prepare(f"SELECT $1::text::{typname}")
 
-            text_out = await self.con.prepare(
-                "SELECT $1::" + typname + "::text"
-            )
+            text_out = await self.con.prepare(f"SELECT $1::{typname}::text")
 
             for sample in sample_data:
                 with self.subTest(sample=sample, typname=typname):
@@ -548,9 +542,7 @@ class TestCodecs(tb.ConnectedTestCase):
 
         for oid, typename in BUILTIN_TYPE_OID_MAP.items():
             codec = self.con.get_settings().get_data_codec(oid)
-            self.assertIsNotNone(
-                codec,
-                'core type {} ({}) is unhandled'.format(typename, oid))
+            self.assertIsNotNone(codec, f'core type {typename} ({oid}) is unhandled')
 
     async def test_void(self):
         res = await self.con.fetchval('select pg_sleep(0)')
@@ -762,7 +754,7 @@ class TestCodecs(tb.ConnectedTestCase):
         ]
 
         for typname, errmsg, data in cases:
-            stmt = await self.con.prepare("SELECT $1::" + typname)
+            stmt = await self.con.prepare(f"SELECT $1::{typname}")
 
             for sample in data:
                 with self.subTest(sample=sample, typname=typname):
@@ -1015,9 +1007,7 @@ class TestCodecs(tb.ConnectedTestCase):
         ]
 
         for (typname, sample_data) in cases:
-            st = await self.con.prepare(
-                "SELECT $1::" + typname
-            )
+            st = await self.con.prepare(f"SELECT $1::{typname}")
 
             for sample, expected in sample_data:
                 with self.subTest(sample=sample, typname=typname):
@@ -1082,9 +1072,7 @@ class TestCodecs(tb.ConnectedTestCase):
         ]
 
         for (typname, sample_data) in cases:
-            st = await self.con.prepare(
-                "SELECT $1::" + typname
-            )
+            st = await self.con.prepare(f"SELECT $1::{typname}")
 
             for sample, expected in sample_data:
                 with self.subTest(sample=sample, typname=typname):
@@ -1380,7 +1368,8 @@ class TestCodecs(tb.ConnectedTestCase):
             await self.con.set_type_codec(
                 'custom_codec_t',
                 encoder=lambda v: str(v).lstrip('enum :'),
-                decoder=lambda v: 'enum: ' + str(v))
+                decoder=lambda v: f'enum: {str(v)}',
+            )
 
             v = await self.con.fetchval('SELECT $1::custom_codec_t', 'foo')
             self.assertEqual(v, 'enum: foo')
@@ -1400,7 +1389,8 @@ class TestCodecs(tb.ConnectedTestCase):
             await self.con.set_type_codec(
                 'custom_codec_t',
                 encoder=lambda v: str(v).lstrip('enum :'),
-                decoder=lambda v: 'enum: ' + str(v))
+                decoder=lambda v: f'enum: {str(v)}',
+            )
 
             v = await self.con.fetchval(
                 "SELECT ARRAY['foo', 'bar']::custom_codec_t[]")
@@ -1533,11 +1523,7 @@ class TestCodecs(tb.ConnectedTestCase):
                         await conn.reset_type_codec(
                             typename, schema='pg_catalog')
 
-                        if extra:
-                            val = extra[0]
-                        else:
-                            val = 'tab.v'
-
+                        val = extra[0] if extra else 'tab.v'
                         res = await conn.fetchval(
                             'SELECT ({val})::text FROM tab'.format(val=val))
                         self.assertEqual(res, expected_result)
@@ -1708,7 +1694,7 @@ class TestCodecs(tb.ConnectedTestCase):
         ''')
 
         try:
-            for i in range(10):
+            for _ in range(10):
                 r = await self.con.fetch('''
                     SELECT a, b FROM tab ORDER BY b
                 ''')
@@ -1790,7 +1776,8 @@ class TestCodecs(tb.ConnectedTestCase):
             # cache properly and that subsequent queries work
             # as expected.
             await self.con.set_type_codec(
-                'citext', encoder=lambda d: d, decoder=lambda d: 'CI: ' + d)
+                'citext', encoder=lambda d: d, decoder=lambda d: f'CI: {d}'
+            )
 
             result = await self.con.fetchval('''
                 SELECT

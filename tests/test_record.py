@@ -209,8 +209,7 @@ class TestRecord(tb.ConnectedTestCase):
         self.assertEqual(hash(r1), hash(r4))
         self.assertEqual(hash(r1), hash(r5))
 
-        d = {}
-        d[r1] = 123
+        d = {r1: 123}
         self.assertEqual(d[r1], 123)
         self.assertIn(r2, d)
         self.assertEqual(d[r2], 123)
@@ -320,8 +319,7 @@ class TestRecord(tb.ConnectedTestCase):
         for desc in records_descs:
             items = collections.OrderedDict(desc)
 
-            query = 'SELECT ' + ', '.join(
-                ['{} as {}'.format(p[1], p[0]) for p in desc])
+            query = ('SELECT ' + ', '.join([f'{p[1]} as {p[0]}' for p in desc]))
 
             with self.subTest(query=query):
                 r = await self.con.fetchrow(query)
@@ -329,8 +327,7 @@ class TestRecord(tb.ConnectedTestCase):
                     self.assertEqual(r[idx], val)
                     self.assertEqual(r[field], items[field])
 
-                expected_repr = '<Record {}>'.format(
-                    ' '.join('{}={}'.format(p[0], p[1]) for p in desc))
+                expected_repr = f"<Record {' '.join(f'{p[0]}={p[1]}' for p in desc)}>"
                 self.assertEqual(repr(r), expected_repr)
 
                 self.assertEqual(list(r.items()), desc)

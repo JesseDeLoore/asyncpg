@@ -46,10 +46,10 @@ def _new_cert(issuer=None, is_issuer=False, serial_number=None, **subject):
         builder = (
             builder.issuer_name(subject)
             .not_valid_before(
-                datetime.datetime.today() - datetime.timedelta(days=1)
+                datetime.datetime.now() - datetime.timedelta(days=1)
             )
             .not_valid_after(
-                datetime.datetime.today() + datetime.timedelta(weeks=1000)
+                datetime.datetime.now() + datetime.timedelta(weeks=1000)
             )
         )
         aki_ext = x509.AuthorityKeyIdentifier.from_issuer_public_key(
@@ -121,7 +121,7 @@ def _write_cert(path, cert_key_pair, password=None):
         encryption = serialization.BestAvailableEncryption(password)
     else:
         encryption = serialization.NoEncryption()
-    with open(path + ".key.pem", "wb") as f:
+    with open(f"{path}.key.pem", "wb") as f:
         f.write(
             private_key.private_bytes(
                 encoding=serialization.Encoding.PEM,
@@ -129,7 +129,7 @@ def _write_cert(path, cert_key_pair, password=None):
                 encryption_algorithm=encryption,
             )
         )
-    with open(path + ".cert.pem", "wb") as f:
+    with open(f"{path}.cert.pem", "wb") as f:
         f.write(
             certificate.public_bytes(
                 encoding=serialization.Encoding.PEM,
@@ -158,18 +158,18 @@ def new_crl(path, issuer, cert):
     revoked_cert = (
         x509.RevokedCertificateBuilder()
         .serial_number(cert[0].serial_number)
-        .revocation_date(datetime.datetime.today())
+        .revocation_date(datetime.datetime.now())
         .build()
     )
     builder = (
         x509.CertificateRevocationListBuilder()
         .issuer_name(issuer_cert.subject)
-        .last_update(datetime.datetime.today())
-        .next_update(datetime.datetime.today() + datetime.timedelta(days=1))
+        .last_update(datetime.datetime.now())
+        .next_update(datetime.datetime.now() + datetime.timedelta(days=1))
         .add_revoked_certificate(revoked_cert)
     )
     crl = builder.sign(private_key=signing_key, algorithm=hashes.SHA256())
-    with open(path + ".crl.pem", "wb") as f:
+    with open(f"{path}.crl.pem", "wb") as f:
         f.write(crl.public_bytes(encoding=serialization.Encoding.PEM))
 
 

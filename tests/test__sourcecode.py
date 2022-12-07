@@ -36,5 +36,4 @@ class TestFlake8(unittest.TestCase):
                 cwd=root_path)
         except subprocess.CalledProcessError as ex:
             output = ex.output.decode()
-            raise AssertionError(
-                'flake8 validation failed:\n{}'.format(output)) from None
+            raise AssertionError(f'flake8 validation failed:\n{output}') from None

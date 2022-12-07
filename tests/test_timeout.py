@@ -117,7 +117,7 @@ class TestTimeout(tb.ConnectedTestCase):
                     await self.connect(command_timeout=command_timeout)
 
         # Note: negative timeouts are OK for method calls.
-        for methname in {'fetch', 'fetchrow', 'fetchval', 'execute'}:
+        for _ in {'fetch', 'fetchrow', 'fetchval', 'execute'}:
             for timeout in ('a', False):
                 with self.subTest(timeout=timeout):
                     with self.assertRaisesRegex(ValueError, 'invalid timeout'):

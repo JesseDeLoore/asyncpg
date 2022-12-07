@@ -54,11 +54,10 @@ async def runner(args):
         '# This module is part of asyncpg and is released under\n'
         '# the Apache 2.0 License: http://www.apache.org/licenses/LICENSE-2.0'
         '\n\n\n'
-        '# GENERATED FROM pg_catalog.pg_type\n' +
-        '# DO NOT MODIFY, use tools/generate_type_map.py to update\n\n' +
-        'DEF INVALIDOID = {}\n'.format(_INVALIDOID) +
-        'DEF MAXBUILTINOID = {}\n'.format(_MAXBUILTINOID)
-    )
+        '# GENERATED FROM pg_catalog.pg_type\n'
+        + '# DO NOT MODIFY, use tools/generate_type_map.py to update\n\n'
+        + f'DEF INVALIDOID = {_INVALIDOID}\n'
+    ) + f'DEF MAXBUILTINOID = {_MAXBUILTINOID}\n'
 
     pg_types = await conn.fetch('''
         SELECT
@@ -82,20 +81,20 @@ async def runner(args):
         typeoid = pg_type['oid']
         typename = pg_type['typname']
 
-        defname = '{}OID'.format(typename.upper())
+        defname = f'{typename.upper()}OID'
         defs.append('DEF {name} = {oid}'.format(name=defname, oid=typeoid))
 
         if typename in _BUILTIN_ARRAYS:
             array_types.append(defname)
-            typename = typename[1:] + '[]'
+            typename = f'{typename[1:]}[]'
 
         typemap[defname] = typename
 
-    buf += 'DEF MAXSUPPORTEDOID = {}\n\n'.format(pg_types[-1]['oid'])
+    buf += f"DEF MAXSUPPORTEDOID = {pg_types[-1]['oid']}\n\n"
 
     buf += '\n'.join(defs)
 
-    buf += '\n\ncdef ARRAY_TYPES = ({},)'.format(', '.join(array_types))
+    buf += f"\n\ncdef ARRAY_TYPES = ({', '.join(array_types)},)"
 
     f_typemap = ('{}: {!r}'.format(dn, n) for dn, n in sorted(typemap.items()))
     buf += '\n\nBUILTIN_TYPE_OID_MAP = {{\n    {}\n}}'.format(

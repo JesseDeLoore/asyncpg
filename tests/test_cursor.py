@@ -25,8 +25,8 @@ class TestIterableCursor(tb.ConnectedTestCase):
                         result.append(rec)
 
                 self.assertEqual(
-                    result, expected,
-                    'result != expected for prefetch={}'.format(prefetch))
+                    result, expected, f'result != expected for prefetch={prefetch}'
+                )
 
     async def test_cursor_iterable_02(self):
         # Test that it's not possible to create a cursor without hold

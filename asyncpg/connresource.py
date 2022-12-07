@@ -33,12 +33,10 @@ class ConnectionResource:
         con_release_ctr = self._connection._pool_release_ctr
         if con_release_ctr != self._con_release_ctr:
             raise exceptions.InterfaceError(
-                'cannot call {}.{}(): '
-                'the underlying connection has been released back '
-                'to the pool'.format(self.__class__.__name__, meth_name))
+                f'cannot call {self.__class__.__name__}.{meth_name}(): the underlying connection has been released back to the pool'
+            )
 
         if self._connection.is_closed():
             raise exceptions.InterfaceError(
-                'cannot call {}.{}(): '
-                'the underlying connection is closed'.format(
-                    self.__class__.__name__, meth_name))
+                f'cannot call {self.__class__.__name__}.{meth_name}(): the underlying connection is closed'
+            )

@@ -34,7 +34,7 @@ from . import utils
 
 class ConnectionMeta(type):
 
-    def __instancecheck__(cls, instance):
+    def __instancecheck__(self, instance):
         mro = type(instance).__mro__
         return Connection in mro or _ConnectionProxy in mro
 
@@ -89,7 +89,7 @@ class Connection(metaclass=ConnectionMeta):
         settings = self._protocol.get_settings()
         ver_string = settings.server_version
         self._server_version = \
-            serverversion.split_server_version_string(ver_string)
+                serverversion.split_server_version_string(ver_string)
 
         self._server_caps = _detect_server_capabilities(
             self._server_version, settings)
@@ -111,10 +111,7 @@ class Connection(metaclass=ConnectionMeta):
         # `con.execute()`, and `con.executemany()`.
         self._stmt_exclusive_section = _Atomic()
 
-        if loop.get_debug():
-            self._source_traceback = _extract_stack()
-        else:
-            self._source_traceback = None
+        self._source_traceback = _extract_stack() if loop.get_debug() else None
 
     def __del__(self):
         if not self.is_closed() and self._protocol is not None:
@@ -150,7 +147,7 @@ class Connection(metaclass=ConnectionMeta):
         """
         self._check_open()
         if channel not in self._listeners:
-            await self.fetch('LISTEN {}'.format(utils._quote_ident(channel)))
+            await self.fetch(f'LISTEN {utils._quote_ident(channel)}')
             self._listeners[channel] = set()
         self._listeners[channel].add(_Callback.from_callable(callback))
 
@@ -166,7 +163,7 @@ class Connection(metaclass=ConnectionMeta):
         self._listeners[channel].remove(cb)
         if not self._listeners[channel]:
             del self._listeners[channel]
-            await self.fetch('UNLISTEN {}'.format(utils._quote_ident(channel)))
+            await self.fetch(f'UNLISTEN {utils._quote_ident(channel)}')
 
     def add_log_listener(self, callback):
         """Add a listener for Postgres log messages.
@@ -383,10 +380,10 @@ class Connection(metaclass=ConnectionMeta):
             #  * `statement_cache_size` is greater than 0;
             #  * query size is less than `max_cacheable_statement_size`.
             use_cache = self._stmt_cache.get_max_size() > 0
-            if (use_cache and
-                    self._config.max_cacheable_statement_size and
-                    len(query) > self._config.max_cacheable_statement_size):
-                use_cache = False
+        if (use_cache and
+                self._config.max_cacheable_statement_size and
+                len(query) > self._config.max_cacheable_statement_size):
+            use_cache = False
 
         if isinstance(named, str):
             stmt_name = named
@@ -427,8 +424,7 @@ class Connection(metaclass=ConnectionMeta):
                 # with reload_schema_state(), which would cause a
                 # second try.  More than five is clearly a bug.
                 raise exceptions.InternalClientError(
-                    'could not resolve query result and/or argument types '
-                    'in {} attempts'.format(tries)
+                    f'could not resolve query result and/or argument types in {tries} attempts'
                 )
 
         # Now that types have been resolved, populate the codec pipeline
@@ -487,8 +483,7 @@ class Connection(metaclass=ConnectionMeta):
             )
 
         if not rows:
-            raise ValueError(
-                'unknown type: {}.{}'.format(schema, typename))
+            raise ValueError(f'unknown type: {schema}.{typename}')
 
         return rows[0]
 
@@ -643,9 +638,7 @@ class Connection(metaclass=ConnectionMeta):
         """
         self._check_open()
         data = await self._execute(query, args, 1, timeout)
-        if not data:
-            return None
-        return data[0][column]
+        return data[0][column] if data else None
 
     async def fetchrow(
         self,
@@ -683,9 +676,7 @@ class Connection(metaclass=ConnectionMeta):
             timeout,
             record_class=record_class,
         )
-        if not data:
-            return None
-        return data[0]
+        return data[0] if data else None
 
     async def copy_from_table(self, table_name, *, output,
                               columns=None, schema_name=None, timeout=None,
@@ -740,11 +731,10 @@ class Connection(metaclass=ConnectionMeta):
         """
         tabname = utils._quote_ident(table_name)
         if schema_name:
-            tabname = utils._quote_ident(schema_name) + '.' + tabname
+            tabname = f'{utils._quote_ident(schema_name)}.{tabname}'
 
         if columns:
-            cols = '({})'.format(
-                ', '.join(utils._quote_ident(c) for c in columns))
+            cols = f"({', '.join(utils._quote_ident(c) for c in columns)})"
         else:
             cols = ''
 
@@ -876,11 +866,10 @@ class Connection(metaclass=ConnectionMeta):
         """
         tabname = utils._quote_ident(table_name)
         if schema_name:
-            tabname = utils._quote_ident(schema_name) + '.' + tabname
+            tabname = f'{utils._quote_ident(schema_name)}.{tabname}'
 
         if columns:
-            cols = '({})'.format(
-                ', '.join(utils._quote_ident(c) for c in columns))
+            cols = f"({', '.join(utils._quote_ident(c) for c in columns)})"
         else:
             cols = ''
 
@@ -962,11 +951,11 @@ class Connection(metaclass=ConnectionMeta):
         """
         tabname = utils._quote_ident(table_name)
         if schema_name:
-            tabname = utils._quote_ident(schema_name) + '.' + tabname
+            tabname = f'{utils._quote_ident(schema_name)}.{tabname}'
 
         if columns:
             col_list = ', '.join(utils._quote_ident(c) for c in columns)
-            cols = '({})'.format(col_list)
+            cols = f'({col_list})'
         else:
             col_list = '*'
             cols = ''
@@ -1006,12 +995,9 @@ class Connection(metaclass=ConnectionMeta):
                 else:
                     v = utils._quote_literal(v)
 
-                opts.append('{} {}'.format(k.upper(), v))
+                opts.append(f'{k.upper()} {v}')
 
-        if opts:
-            return '(' + ', '.join(opts) + ')'
-        else:
-            return ''
+        return '(' + ', '.join(opts) + ')' if opts else ''
 
     async def _copy_out(self, copy_stmt, output, timeout):
         try:
@@ -1222,8 +1208,8 @@ class Connection(metaclass=ConnectionMeta):
         typeinfo = await self._introspect_type(typename, schema)
         if not introspection.is_scalar_type(typeinfo):
             raise exceptions.InterfaceError(
-                'cannot use custom codec on non-scalar type {}.{}'.format(
-                    schema, typename))
+                f'cannot use custom codec on non-scalar type {schema}.{typename}'
+            )
         if introspection.is_domain_type(typeinfo):
             raise exceptions.UnsupportedClientFeatureError(
                 'custom codecs on domain types are not supported',
@@ -1301,8 +1287,8 @@ class Connection(metaclass=ConnectionMeta):
         typeinfo = await self._introspect_type(typename, schema)
         if not introspection.is_scalar_type(typeinfo):
             raise exceptions.InterfaceError(
-                'cannot alias non-scalar type {}.{}'.format(
-                    schema, typename))
+                f'cannot alias non-scalar type {schema}.{typename}'
+            )
 
         oid = typeinfo['oid']
 
@@ -1513,15 +1499,7 @@ class Connection(metaclass=ConnectionMeta):
                 self._loop.call_soon(cb.cb, con_ref, pid, channel, payload)
 
     def _unwrap(self):
-        if self._proxy is None:
-            con_ref = self
-        else:
-            # `_proxy` is not None when the connection is a member
-            # of a connection pool.  Which means that the user is working
-            # with a `PoolConnectionProxy` instance, and expects to see it
-            # (and not the actual Connection) in their event callbacks.
-            con_ref = self._proxy
-        return con_ref
+        return self if self._proxy is None else self._proxy
 
     def _get_reset_query(self):
         if self._reset_query is not None:
@@ -2320,15 +2298,10 @@ def _detect_server_capabilities(server_version, connection_settings):
         plpgsql = False
         sql_reset = True
         sql_close_all = False
-    elif hasattr(connection_settings, 'crdb_version'):
+    elif hasattr(connection_settings, 'crdb_version') or hasattr(
+        connection_settings, 'crate_version'
+    ):
         # CockroachDB detected.
-        advisory_locks = False
-        notifications = False
-        plpgsql = False
-        sql_reset = False
-        sql_close_all = False
-    elif hasattr(connection_settings, 'crate_version'):
-        # CrateDB detected.
         advisory_locks = False
         notifications = False
         plpgsql = False
