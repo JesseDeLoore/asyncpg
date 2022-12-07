@@ -32,17 +32,16 @@ def main():
         message = commit['commit']['message']
         first_line = message.partition('\n\n')[0]
         if commit.get('author'):
-            username = '@{}'.format(commit['author']['login'])
+            username = f"@{commit['author']['login']}"
         else:
             username = commit['commit']['author']['name']
         sha = commit["sha"][:8]
 
-        m = re.search(r'\#(?P<num>\d+)\b', message)
-        if m:
-            issue_num = m.group('num')
-        else:
-            issue_num = None
-
+        issue_num = (
+            m['num']
+            if (m := re.search(r'\#(?P<num>\d+)\b', message))
+            else None
+        )
         print(f'* {first_line}')
         print(f'  (by {username} in {sha}', end='')
         if issue_num:

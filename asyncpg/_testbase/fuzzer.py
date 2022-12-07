@@ -220,10 +220,7 @@ class Connection:
                 [read_task, conn_event_task],
                 return_when=asyncio.FIRST_COMPLETED)
 
-            if self.connectivity_loss.is_set():
-                return None
-            else:
-                return read_task.result()
+            return None if self.connectivity_loss.is_set() else read_task.result()
         finally:
             if not self.loop.is_closed():
                 if not read_task.done():
@@ -242,10 +239,7 @@ class Connection:
                 [write_task, conn_event_task],
                 return_when=asyncio.FIRST_COMPLETED)
 
-            if self.connectivity_loss.is_set():
-                return None
-            else:
-                return write_task.result()
+            return None if self.connectivity_loss.is_set() else write_task.result()
         finally:
             if not self.loop.is_closed():
                 if not write_task.done():

@@ -141,10 +141,9 @@ class BaseCursor(connresource.ConnectionResource):
         protocol = con._protocol
 
         self._portal_name = con._get_unique_id('portal')
-        buffer = await protocol.bind(self._state, self._args,
-                                     self._portal_name,
-                                     timeout)
-        return buffer
+        return await protocol.bind(
+            self._state, self._args, self._portal_name, timeout
+        )
 
     async def _exec(self, n, timeout):
         self._check_ready()

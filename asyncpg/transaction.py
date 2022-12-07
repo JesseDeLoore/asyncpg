@@ -119,7 +119,7 @@ class Transaction(connresource.ConnectionResource):
 
         if self._nested:
             self._id = con._get_unique_id('savepoint')
-            query = 'SAVEPOINT {};'.format(self._id)
+            query = f'SAVEPOINT {self._id};'
         else:
             query = 'BEGIN'
             if self._isolation == 'read_committed':
@@ -145,23 +145,23 @@ class Transaction(connresource.ConnectionResource):
     def __check_state_base(self, opname):
         if self._state is TransactionState.COMMITTED:
             raise apg_errors.InterfaceError(
-                'cannot {}; the transaction is already committed'.format(
-                    opname))
+                f'cannot {opname}; the transaction is already committed'
+            )
         if self._state is TransactionState.ROLLEDBACK:
             raise apg_errors.InterfaceError(
-                'cannot {}; the transaction is already rolled back'.format(
-                    opname))
+                f'cannot {opname}; the transaction is already rolled back'
+            )
         if self._state is TransactionState.FAILED:
             raise apg_errors.InterfaceError(
-                'cannot {}; the transaction is in error state'.format(
-                    opname))
+                f'cannot {opname}; the transaction is in error state'
+            )
 
     def __check_state(self, opname):
         if self._state is not TransactionState.STARTED:
             if self._state is TransactionState.NEW:
                 raise apg_errors.InterfaceError(
-                    'cannot {}; the transaction is not yet started'.format(
-                        opname))
+                    f'cannot {opname}; the transaction is not yet started'
+                )
             self.__check_state_base(opname)
 
     async def __commit(self):
@@ -170,11 +170,7 @@ class Transaction(connresource.ConnectionResource):
         if self._connection._top_xact is self:
             self._connection._top_xact = None
 
-        if self._nested:
-            query = 'RELEASE SAVEPOINT {};'.format(self._id)
-        else:
-            query = 'COMMIT;'
-
+        query = f'RELEASE SAVEPOINT {self._id};' if self._nested else 'COMMIT;'
         try:
             await self._connection.execute(query)
         except BaseException:
@@ -189,11 +185,7 @@ class Transaction(connresource.ConnectionResource):
         if self._connection._top_xact is self:
             self._connection._top_xact = None
 
-        if self._nested:
-            query = 'ROLLBACK TO {};'.format(self._id)
-        else:
-            query = 'ROLLBACK;'
-
+        query = f'ROLLBACK TO {self._id};' if self._nested else 'ROLLBACK;'
         try:
             await self._connection.execute(query)
         except BaseException:
@@ -219,9 +211,7 @@ class Transaction(connresource.ConnectionResource):
         await self.__rollback()
 
     def __repr__(self):
-        attrs = []
-        attrs.append('state:{}'.format(self._state.name.lower()))
-
+        attrs = [f'state:{self._state.name.lower()}']
         if self._isolation is not None:
             attrs.append(self._isolation)
         if self._readonly:

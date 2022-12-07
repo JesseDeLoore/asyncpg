@@ -118,10 +118,10 @@ class TestCase(unittest.TestCase, metaclass=TestCaseMeta):
 
     def tearDown(self):
         if self.__unhandled_exceptions:
-            formatted = []
-
-            for i, context in enumerate(self.__unhandled_exceptions):
-                formatted.append(self._format_loop_exception(context, i + 1))
+            formatted = [
+                self._format_loop_exception(context, i + 1)
+                for i, context in enumerate(self.__unhandled_exceptions)
+            ]
 
             self.fail(
                 'unexpected exceptions in asynchronous code:\n' +
@@ -183,15 +183,14 @@ class TestCase(unittest.TestCase, metaclass=TestCaseMeta):
             value = context[key]
             if key == 'source_traceback':
                 tb = ''.join(traceback.format_list(value))
-                value = 'Object created at (most recent call last):\n'
-                value += tb.rstrip()
+                value = 'Object created at (most recent call last):\n' + tb.rstrip()
             else:
                 try:
                     value = repr(value)
                 except Exception as ex:
                     value = ('Exception in __repr__ {!r}; '
                              'value type: {!r}'.format(ex, type(value)))
-            lines.append('[{}]: {}\n\n'.format(key, value))
+            lines.append(f'[{key}]: {value}\n\n')
 
         if exc_info is not None:
             lines.append('[exception]:\n')
@@ -222,11 +221,7 @@ def _start_cluster(ClusterCls, cluster_kwargs, server_settings,
 
 
 def _get_initdb_options(initdb_options=None):
-    if not initdb_options:
-        initdb_options = {}
-    else:
-        initdb_options = dict(initdb_options)
-
+    initdb_options = dict(initdb_options) if initdb_options else {}
     # Make the default superuser name stable.
     if 'username' not in initdb_options:
         initdb_options['username'] = 'postgres'
@@ -238,8 +233,7 @@ def _init_default_cluster(initdb_options=None):
     global _default_cluster
 
     if _default_cluster is None:
-        pg_host = os.environ.get('PGHOST')
-        if pg_host:
+        if pg_host := os.environ.get('PGHOST'):
             # Using existing cluster, assuming it is initialized and running
             _default_cluster = pg_cluster.RunningCluster()
         else:
@@ -380,9 +374,7 @@ class ProxiedClusterTestCase(ClusterTestCase):
         super().setUpClass()
         conn_spec = cls.cluster.get_connection_spec()
         host = conn_spec.get('host')
-        if not host:
-            host = '127.0.0.1'
-        elif host.startswith('/'):
+        if not host or host and host.startswith('/'):
             host = '127.0.0.1'
         cls.proxy = fuzzer.TCPFuzzingProxy(
             backend_host=host,

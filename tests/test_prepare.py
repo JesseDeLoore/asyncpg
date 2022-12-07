@@ -229,7 +229,7 @@ class TestPrepare(tb.ConnectedTestCase):
         self.assertEqual(len(self.con._stmts_to_close), 0)
 
         for i in range(cache_max):
-            await self.con._prepare('select {}'.format(i), use_cache=True)
+            await self.con._prepare(f'select {i}', use_cache=True)
 
         self.assertEqual(len(cache), cache_max)
         self.assertEqual(len(self.con._stmts_to_close), 0)
@@ -537,8 +537,8 @@ class TestPrepare(tb.ConnectedTestCase):
 
     async def test_prepare_28_max_args(self):
         N = 32768
-        args = ','.join('${}'.format(i) for i in range(1, N + 1))
-        query = 'SELECT ARRAY[{}]'.format(args)
+        args = ','.join(f'${i}' for i in range(1, N + 1))
+        query = f'SELECT ARRAY[{args}]'
 
         with self.assertRaisesRegex(
                 exceptions.InterfaceError,

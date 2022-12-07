@@ -25,8 +25,9 @@ if SYSTEM == 'Windows':
         # home directory, whereas Postgres stores its config in
         # %AppData% on Windows.
         buf = ctypes.create_unicode_buffer(ctypes.wintypes.MAX_PATH)
-        r = ctypes.windll.shell32.SHGetFolderPathW(0, CSIDL_APPDATA, 0, 0, buf)
-        if r:
+        if r := ctypes.windll.shell32.SHGetFolderPathW(
+            0, CSIDL_APPDATA, 0, 0, buf
+        ):
             return None
         else:
             return pathlib.Path(buf.value) / 'postgresql'

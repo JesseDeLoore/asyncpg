@@ -60,7 +60,7 @@ def _get_error_name(sqlstatename, msgtype, sqlstate):
     errname = ''.join(parts)
 
     if hasattr(builtins, errname):
-        errname = 'Postgres' + errname
+        errname = f'Postgres{errname}'
 
     return errname
 
@@ -93,11 +93,7 @@ class {clsname}({base}):
     clsnames = set()
 
     def _add_class(clsname, base, sqlstate, docstring):
-        if sqlstate:
-            sqlstate = "sqlstate = '{}'".format(sqlstate)
-        else:
-            sqlstate = ''
-
+        sqlstate = "sqlstate = '{}'".format(sqlstate) if sqlstate else ''
         txt = tpl.format(clsname=clsname, base=base, sqlstate=sqlstate,
                          docstring=docstring)
 
@@ -141,11 +137,7 @@ class {clsname}({base}):
             if clsname == 'PostgresWarning':
                 base = '_base.PostgresLogMessage, Warning'
             else:
-                if msgtype == 'W':
-                    base = 'PostgresWarning'
-                else:
-                    base = '_base.PostgresError'
-
+                base = 'PostgresWarning' if msgtype == 'W' else '_base.PostgresError'
             new_section = False
         else:
             base = section_class

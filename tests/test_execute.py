@@ -159,7 +159,7 @@ class TestExecuteMany(tb.ConnectedTestCase):
             ''', [(0,), ("bad",)])
 
     async def test_executemany_error_in_input_gen(self):
-        bad_data = ([1 / 0] for v in range(10))
+        bad_data = ([1 / 0] for _ in range(10))
 
         with self.assertRaises(ZeroDivisionError):
             async with self.con.transaction():
