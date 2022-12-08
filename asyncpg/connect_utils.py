@@ -74,14 +74,10 @@ _ClientConfiguration = collections.namedtuple(
 _system = platform.uname().system
 
 
-if _system == 'Windows':
-    PGPASSFILE = 'pgpass.conf'
-else:
-    PGPASSFILE = '.pgpass'
+PGPASSFILE = 'pgpass.conf' if _system == 'Windows' else '.pgpass'
 
 
-def _read_password_file(passfile: pathlib.Path) \
-        -> typing.List[typing.Tuple[str, ...]]:
+def _read_password_file(passfile: pathlib.Path) -> typing.List[typing.Tuple[str, ...]]:
 
     passtab = []
 
@@ -95,14 +91,15 @@ def _read_password_file(passfile: pathlib.Path) \
 
             return []
 
-        if _system != 'Windows':
-            if passfile.stat().st_mode & (stat.S_IRWXG | stat.S_IRWXO):
-                warnings.warn(
-                    'password file {!r} has group or world access; '
-                    'permissions should be u=rw (0600) or less'.format(
-                        passfile))
+        if _system != 'Windows' and passfile.stat().st_mode & (
+            stat.S_IRWXG | stat.S_IRWXO
+        ):
+            warnings.warn(
+                'password file {!r} has group or world access; '
+                'permissions should be u=rw (0600) or less'.format(
+                    passfile))
 
-                return []
+            return []
 
         with passfile.open('rt') as f:
             for line in f:
@@ -145,13 +142,13 @@ def _read_password_from_pgpass(
             host = 'localhost'
 
         for phost, pport, pdatabase, puser, ppassword in passtab:
-            if phost != '*' and phost != host:
+            if phost not in ['*', host]:
                 continue
-            if pport != '*' and pport != str(port):
+            if pport not in ['*', str(port)]:
                 continue
-            if pdatabase != '*' and pdatabase != database:
+            if pdatabase not in ['*', database]:
                 continue
-            if puser != '*' and puser != user:
+            if puser not in ['*', user]:
                 continue
 
             # Found a match.
@@ -166,8 +163,8 @@ def _validate_port_spec(hosts, port):
         # match that of the host list.
         if len(port) != len(hosts):
             raise exceptions.InterfaceError(
-                'could not match {} port numbers to {} hosts'.format(
-                    len(port), len(hosts)))
+                f'could not match {len(port)} port numbers to {len(hosts)} hosts'
+            )
     else:
         port = [port for _ in range(len(hosts))]
 
@@ -175,18 +172,12 @@ def _validate_port_spec(hosts, port):
 
 
 def _parse_hostlist(hostlist, port, *, unquote=False):
-    if ',' in hostlist:
-        # A comma-separated list of host addresses.
-        hostspecs = hostlist.split(',')
-    else:
-        hostspecs = [hostlist]
-
+    hostspecs = hostlist.split(',') if ',' in hostlist else [hostlist]
     hosts = []
     hostlist_ports = []
 
     if not port:
-        portspec = os.environ.get('PGPORT')
-        if portspec:
+        if portspec := os.environ.get('PGPORT'):
             if ',' in portspec:
                 default_port = [int(p) for p in portspec.split(',')]
             else:
@@ -205,17 +196,16 @@ def _parse_hostlist(hostlist, port, *, unquote=False):
             addr = hostspec
             hostspec_port = ''
         elif hostspec[0] == '[':
-            # IPv6 address
-            m = re.match(r'(?:\[([^\]]+)\])(?::([0-9]+))?', hostspec)
-            if m:
-                addr = m.group(1)
-                hostspec_port = m.group(2)
-            else:
+            if not (
+                m := re.match(r'(?:\[([^\]]+)\])(?::([0-9]+))?', hostspec)
+            ):
                 raise ValueError(
                     'invalid IPv6 address in the connection URI: {!r}'.format(
                         hostspec
                     )
                 )
+            addr = m[1]
+            hostspec_port = m[2]
         else:
             # IPv4 address
             addr, _, hostspec_port = hostspec.partition(':')
